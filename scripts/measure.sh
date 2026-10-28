@@ -39,12 +39,20 @@ images=(
   "traefik|$(official traefik)|$(hardened traefik)"
 )
 
+# The summary line of `docker scout quickview`, or nothing. Its whole output is
+# kept, and shown when there is no summary to read, so a failed login or a
+# changed format says what it was instead of ending the run in silence.
 scout() {
-  if docker scout version >/dev/null 2>&1; then docker scout quickview "$1" 2>&1
+  if docker scout version >/dev/null 2>&1; then docker scout quickview "$1" > "$work/s.out" 2>&1 || true
   else docker run --rm -e DOCKER_SCOUT_HUB_USER -e DOCKER_SCOUT_HUB_PASSWORD \
          -v "$HOME/.docker/config.json:/root/.docker/config.json:ro" \
-         -v /var/run/docker.sock:/var/run/docker.sock "$SCOUT_IMAGE" quickview "$1" 2>&1; fi \
-    | sed 's/\x1b\[[0-9;]*m//g' | grep -m1 -E '^ *Target' | sed -E 's/.*│ *//'
+         -v /var/run/docker.sock:/var/run/docker.sock "$SCOUT_IMAGE" quickview "$1" > "$work/s.out" 2>&1 || true; fi
+  local line
+  line="$(sed 's/\x1b\[[0-9;]*m//g' "$work/s.out" | grep -m1 -E '^ *Target' || true)"
+  if [ -z "$line" ]; then
+    echo "Docker Scout gave no summary for $1:" >&2; tail -n 15 "$work/s.out" >&2; return 0
+  fi
+  sed -E 's/.*│ *//' <<<"$line"
 }
 
 docker volume create trivy-cache >/dev/null
@@ -86,12 +94,20 @@ PY
 done
 json="${json%,}]"
 trivy_v="$(docker run --rm "$TRIVY_IMAGE" --version | head -1)"
+if docker scout version >/dev/null 2>&1; then
+  scout_v="the docker scout plugin $(docker scout version 2>/dev/null | grep -o -m1 'v[0-9][0-9.]*' || true)"
+else
+  scout_v="${SCOUT_IMAGE%%@*}"
+fi
 {
   printf '# CVE counts, %s\n\n' "$(date -u +%Y-%m-%d)"
   # shellcheck disable=SC2016  # the backticks are Markdown, printed as they are
   printf 'Platform %s. Trivy: %s, no VEX. Docker Scout: %s, with the VEX Docker publishes for its hardened images. Counted once per CVE and package; `?` is severity not yet assigned.\n\n' \
-    "$(uname -m)" "$trivy_v" "${SCOUT_IMAGE%%@*}"
+    "$(uname -m)" "$trivy_v" "$scout_v"
   printf '%b' "$md"
 } > "$out/cves.md"
 printf '%s\n' "$json" | python3 -I -m json.tool > "$out/cves.json"
 cat "$out/cves.md"
+# Written either way, so the run keeps what it did read; failed if any cell
+# could not be read, so a gap in the table is never mistaken for a zero.
+if grep -q 'not read' "$out/cves.md"; then echo "some counts could not be read" >&2; exit 1; fi

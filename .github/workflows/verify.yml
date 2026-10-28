@@ -103,9 +103,12 @@ jobs:
           DOCKER_SCOUT_HUB_USER: ${{ secrets.DOCKERHUB_USERNAME }}
           DOCKER_SCOUT_HUB_PASSWORD: ${{ secrets.DOCKERHUB_TOKEN }}
         run: |
-          ./scripts/measure.sh
-          cat reports/cves.md >> "$GITHUB_STEP_SUMMARY"
+          rc=0
+          ./scripts/measure.sh || rc=$?
+          [ -f reports/cves.md ] && cat reports/cves.md >> "$GITHUB_STEP_SUMMARY"
+          exit "$rc"
       - name: Keep the counts
+        if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: cves
