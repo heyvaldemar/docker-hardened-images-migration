@@ -55,8 +55,15 @@ for row in "${images[@]}"; do
   cells=()
   for ref in "$off" "$dhi"; do
     docker pull -q "$ref" >/dev/null
-    docker run --rm -v /var/run/docker.sock:/var/run/docker.sock -v trivy-cache:/root/.cache \
-      "$TRIVY_IMAGE" image --quiet --format json --scanners vuln "$ref" > "$work/t.json"
+    # The vulnerability databases come from Google's mirror: ghcr.io answers a
+    # fresh CI runner with 429 often enough to fail a weekly run.
+    if ! docker run --rm -v /var/run/docker.sock:/var/run/docker.sock -v trivy-cache:/root/.cache \
+        "$TRIVY_IMAGE" image --quiet --format json --scanners vuln \
+        --db-repository mirror.gcr.io/aquasec/trivy-db:2 \
+        --java-db-repository mirror.gcr.io/aquasec/trivy-java-db:1 \
+        "$ref" > "$work/t.json" 2> "$work/t.err"; then
+      echo "Trivy failed on $ref:" >&2; tail -n 20 "$work/t.err" >&2; exit 1
+    fi
     cells+=("$(python3 -I - "$work/t.json" <<'PY'
 import json, sys
 seen, c = set(), {}
