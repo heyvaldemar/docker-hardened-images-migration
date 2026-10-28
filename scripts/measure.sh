@@ -44,7 +44,10 @@ images=(
 # changed format says what it was instead of ending the run in silence.
 scout() {
   if docker scout version >/dev/null 2>&1; then docker scout quickview "$1" > "$work/s.out" 2>&1 || true
-  else docker run --rm -e DOCKER_SCOUT_HUB_USER -e DOCKER_SCOUT_HUB_PASSWORD \
+  # As root: the CLI image's own user can read neither the Docker socket nor
+  # /root/.docker/config.json, and then fails to pull from dhi.io instead of
+  # reading the image already pulled.
+  else docker run --rm -u root -e DOCKER_SCOUT_HUB_USER -e DOCKER_SCOUT_HUB_PASSWORD \
          -v "$HOME/.docker/config.json:/root/.docker/config.json:ro" \
          -v /var/run/docker.sock:/var/run/docker.sock "$SCOUT_IMAGE" quickview "$1" > "$work/s.out" 2>&1 || true; fi
   local line
