@@ -18,7 +18,10 @@ services:
     # Left on the template's mount, it initialises a new cluster beside the
     # volume: here that fails on the read-only root, and in a stack without
     # read_only the data lives in the container and is gone at the next
-    # recreate (tests/e2e-trap.sh shows both).
+    # recreate (tests/e2e-trap.sh shows both). Docker's guide suggests the
+    # parent, /var/lib/postgresql, for a new install; the versioned path keeps
+    # an install moved from the official image working, its files being at
+    # the root of the volume.
     volumes: !override
       - keycloak-postgres:/var/lib/postgresql/16/data
   backups:

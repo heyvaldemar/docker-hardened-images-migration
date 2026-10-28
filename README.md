@@ -26,6 +26,8 @@ On the official image's mount path, without a read-only root, the hardened Postg
 
 `tests/e2e-trap.sh` shows it happening: a row written on the official path, zero files on the volume, and the row gone after a recreate. The same test on the DHI path keeps the row. The template's read-only root is what turned this into the loud failure in the first row of the table; a stack without one loses its data quietly.
 
+The path itself is documented: Docker's [guide to the DHI PostgreSQL image](https://hub.docker.com/hardened-images/catalog/dhi/postgres/guides) lists `/var/lib/postgresql/<major>/data` as PGDATA and recommends mounting a new install's volume at the parent, `/var/lib/postgresql`. What the guide cannot know is which compose files still mount the official image's path. This override mounts at the versioned path instead, which the guide says works, because an install moved from the official image has its files at the root of the volume.
+
 ## Moving an install that already runs
 
 1. Stop the stack. Its volumes stay.
