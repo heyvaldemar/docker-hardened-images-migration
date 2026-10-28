@@ -36,6 +36,16 @@ The path itself is documented: Docker's [guide to the DHI PostgreSQL image](http
 
 Skip step 2, and the hardened PostgreSQL stops with `Permission denied` and starts nothing. `tests/e2e-upgrade.sh` shows that refusal first, then does the move: a realm created on the official images is there on DHI.
 
+Docker's guide describes two other routes: a logical dump and restore, and a direct copy of the files into the versioned directory of a new volume. The direct copy, as the guide words it today, has two steps missing. `tests/e2e-guide-copy.sh` runs it three ways:
+
+| The copy | Result |
+|---|---|
+| As written: `cp -a /old/. /new/16/data/` | Fails, because `/new/16` does not exist; the guide's next command then starts the hardened image on a new, empty cluster |
+| With `mkdir -p /new/16` first | Copies, but the files keep uid 999 and the hardened image stops with `Permission denied` |
+| `mkdir -p /new/16/data && cp -a /old/. /new/16/data/ && chown -R 70:70 /new/16` | The data is there |
+
+The hardened image's user is uid 70 in PostgreSQL 16, 17 and 18 alike.
+
 ## CVE counts
 
 From [run 40742373013](https://github.com/heyvaldemar/docker-hardened-images-migration/actions/runs/40742373013), on amd64, counted once per CVE and package (C critical, H high, M medium, L low, ? not yet rated):
@@ -70,6 +80,7 @@ Verify measures again every Monday, on the same pinned images and the scanners' 
 | `tests/e2e-fresh.sh` | A new install comes up healthy on DHI, Keycloak answers through Traefik with the right OpenID issuer, and a realm outlives a recreate of the database and Keycloak |
 | `tests/e2e-upgrade.sh` | The official install comes up and gets a realm; the hardened PostgreSQL refuses its volume until the move; after the move the realm is there |
 | `tests/e2e-trap.sh` | The official mount path loses the data; the DHI path keeps it |
+| `tests/e2e-guide-copy.sh` | The guide's direct copy fails as written, fails again with only the directory made, and keeps the data with the owner handed over |
 | `tests/e2e-sabotage.sh <change>` | Each of the five changes, taken out on its own, fails the way its comment says |
 | `scripts/measure.sh` | The CVE table above, by both scanners |
 
@@ -88,7 +99,7 @@ Verify measures again every Monday, on the same pinned images and the scanners' 
 | `stacks/keycloak/template.lock` | The template's release and commit |
 | `scripts/move-postgres-volume.sh` | The one-time handover of an existing database volume |
 | `scripts/measure.sh` | The CVE counts by Trivy and Docker Scout |
-| `tests/` | The four tests above, and `sabotage.py`, which removes one change from the override |
+| `tests/` | The tests above, and `sabotage.py`, which removes one change from the override |
 | `ci-images.pins` | Every tool image, pinned by digest |
 
 ## Questions, bugs and changes

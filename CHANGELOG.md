@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 _(no unreleased changes yet)_
 
+## [1.0.1] - 2026-10-28
+
+### Added
+
+- **The guide's direct copy, tested.** `tests/e2e-guide-copy.sh` runs the "Direct data copy" route from Docker's guide to the DHI PostgreSQL image as written, with only the missing directory made, and with the directory made and the files handed to uid 70. Only the last keeps the data: as written the copy fails and the next step starts an empty cluster, and with the directory alone the files keep uid 999 and the image refuses them. The README gives the working command.
+
+### Changed
+
+- **The README credits Docker's guide** for the versioned PGDATA path and says why this override mounts the versioned path rather than the parent the guide recommends for new installs: an install moved from the official image has its files at the root of the volume.
+
 ## [1.0.0] - 2026-10-28
 
 ### Added
@@ -18,5 +28,6 @@ _(no unreleased changes yet)_
 - **Tests on every change and every Monday.** A new install, the move of an install that runs on the official images, the data-loss trap on the database alone, and each of the five changes taken out to show the failure it fixes.
 - **CVE counts by two scanners.** Trivy without VEX and Docker Scout with Docker's VEX, for each official image and its hardened counterpart.
 
-[Unreleased]: https://github.com/heyvaldemar/docker-hardened-images-migration/compare/v1.0.0...HEAD
+[Unreleased]: https://github.com/heyvaldemar/docker-hardened-images-migration/compare/v1.0.1...HEAD
+[1.0.1]: https://github.com/heyvaldemar/docker-hardened-images-migration/compare/v1.0.0...v1.0.1
 [1.0.0]: https://github.com/heyvaldemar/docker-hardened-images-migration/releases/tag/v1.0.0

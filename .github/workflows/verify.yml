@@ -51,6 +51,7 @@ jobs:
       matrix:
         test:
           - e2e-trap.sh
+          - e2e-guide-copy.sh
           - e2e-fresh.sh
           - e2e-upgrade.sh
           - e2e-sabotage.sh postgres-volume
