@@ -1,0 +1,48 @@
+# heyvaldemar/keycloak-traefik-letsencrypt-docker-compose, at the release in
+# template.lock, on Docker Hardened Images. It goes next to the template's own
+# compose file, which stays untouched:
+#
+#   docker compose -f keycloak-traefik-letsencrypt-docker-compose.yml \
+#                  -f dhi.override.yml up -d
+#
+# Each change below is one the move needed when the template was run on these
+# images, and each comment says what broke without it. Nothing else differs.
+# An existing install moves its database volume first, once, with
+# scripts/move-postgres-volume.sh. `!override` needs Docker Compose 2.24.4 or
+# newer.
+services:
+  postgres:
+    image: dhi.io/postgres:16@sha256:e3b4059f05cecc8c4b452ed9c20cd189b6ae9b64f6181aacf9940eb95a11049f
+    # DHI keeps the cluster in /var/lib/postgresql/16/data, not in the
+    # official image's /var/lib/postgresql/data, and runs as uid 70, not 999.
+    # Left on the template's mount, it initialises a new cluster beside the
+    # volume: here that fails on the read-only root, and in a stack without
+    # read_only the data lives in the container and is gone at the next
+    # recreate (tests/e2e-trap.sh shows both).
+    volumes: !override
+      - keycloak-postgres:/var/lib/postgresql/16/data
+  backups:
+    # The backup loop is a shell script; the runtime image has no shell.
+    image: dhi.io/postgres:16-dev@sha256:840a3336e67cb3eff5ce87cd929df427e4a2faec85fb5d9ef4b15c62ae861303
+    # The official entrypoint runs a non-postgres command as it is; this one
+    # always drops root first, which needs the SETUID the template takes away.
+    entrypoint: []
+  keycloak:
+    image: dhi.io/keycloak:26@sha256:85c0863e9c0534c15e096e01db61c516112acd2ba626b427f11d1afc8ed002fe
+    # The template pins the official image's uid 1000; this image's files
+    # belong to 65532, and the first start rebuilds Keycloak into them.
+    user: "65532:65532"
+    healthcheck:
+      # The image has bash but no grep, cat or tee: builtins only.
+      test:
+        - "CMD-SHELL"
+        - |
+          exec 3<>/dev/tcp/localhost/9000 &&
+          printf 'GET /health/ready HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n' >&3 &&
+          read -r status <&3 &&
+          case "$$status" in *" 200 "*) exit 0 ;; *) exit 1 ;; esac
+  traefik:
+    image: dhi.io/traefik:3@sha256:6bda6cb02db098057796a26856b1afb45b875dc1e9ac671ff080b0bf21b3fa3a
+    healthcheck:
+      # No wget in the image: Traefik checks its own ping entry point.
+      test: ["CMD", "/usr/bin/traefik", "healthcheck", "--ping", "--ping.entrypoint=ping", "--entrypoints.ping.address=:8082"]

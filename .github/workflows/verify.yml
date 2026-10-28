@@ -1,0 +1,113 @@
+name: Verify
+
+# The template, on Docker Hardened Images, proven four ways on every change and
+# every week: a new install, an install that moves from the official images,
+# the data-loss trap on the database alone, and each change in the override
+# taken out to show the failure it fixes. Then the CVE counts, by two scanners.
+#
+# dhi.io refuses anonymous pulls, so every job that runs an image logs in with
+# the repository's Docker Hub secrets. A fork's pull request has none and fails
+# at that step, by design.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: "17 6 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: verify-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  lint:
+    name: ShellCheck and actionlint
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Lint
+        run: |
+          set -a; . ./ci-images.pins; set +a
+          docker run --rm -v "$PWD:/mnt" -w /mnt "$SHELLCHECK_IMAGE" -x scripts/*.sh tests/*.sh
+          docker run --rm -v "$PWD:/repo" -w /repo "$ACTIONLINT_IMAGE"
+
+  e2e:
+    name: ${{ matrix.test }}
+    needs: lint
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      matrix:
+        test:
+          - e2e-trap.sh
+          - e2e-fresh.sh
+          - e2e-upgrade.sh
+          - e2e-sabotage.sh postgres-volume
+          - e2e-sabotage.sh traefik-healthcheck
+          - e2e-sabotage.sh keycloak-user
+          - e2e-sabotage.sh keycloak-healthcheck
+          - e2e-sabotage.sh backups-entrypoint
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Log in to dhi.io
+        uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4
+        with:
+          registry: dhi.io
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - name: Run
+        env:
+          TEST: ${{ matrix.test }}
+        run: |
+          read -r script arg <<<"$TEST"
+          # shellcheck disable=SC2086  # the argument is optional and one word
+          bash "tests/$script" $arg
+
+  measure:
+    name: CVE counts, official and hardened, by Trivy and Docker Scout
+    needs: lint
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Log in to Docker Hub
+        uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - name: Log in to dhi.io
+        uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4
+        with:
+          registry: dhi.io
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - name: Measure
+        env:
+          DOCKER_SCOUT_HUB_USER: ${{ secrets.DOCKERHUB_USERNAME }}
+          DOCKER_SCOUT_HUB_PASSWORD: ${{ secrets.DOCKERHUB_TOKEN }}
+        run: |
+          ./scripts/measure.sh
+          cat reports/cves.md >> "$GITHUB_STEP_SUMMARY"
+      - name: Keep the counts
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: cves
+          path: reports/
+          if-no-files-found: error

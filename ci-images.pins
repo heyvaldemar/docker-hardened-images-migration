@@ -1,0 +1,10 @@
+# Every image the tests and the measurement run that is not part of the stack
+# itself, pinned by digest. The stack's own images are pinned where they live:
+# the official ones in the template's compose file at the tag in
+# stacks/keycloak/template.lock, the hardened ones in
+# stacks/keycloak/dhi.override.yml.
+TRIVY_IMAGE=aquasec/trivy:0.76.1@sha256:790fd66d1697395d8693d1acaa1ea702406a20f109b6fc7bac8db623eca6c06c
+SCOUT_IMAGE=docker/scout-cli:1.28.0@sha256:3f9d5fd0b7093853383800941ff50825c77a2bd6cf118717f158c2efc18ac3c3
+HELPER_IMAGE=alpine:3.22@sha256:2e0b81d60597f449baa56dc25d355367869d2dca4cd57e866f1e2b52af3eb55f
+SHELLCHECK_IMAGE=koalaman/shellcheck:stable@sha256:bb596a0d169b85ddd81d8b6d3a2ff6d5baf5fca10b97f575ebc647c3dff62b3d
+ACTIONLINT_IMAGE=rhysd/actionlint:1.7.12@sha256:b1934ee5f1c509618f2508e6eb47ee0d3520686341fec936f3b79331f9315667

@@ -1,0 +1,16 @@
+# Keeps the pinned GitHub Actions current. The images in ci-images.pins and
+# dhi.override.yml are pinned by digest in files Dependabot does not read;
+# they are moved by hand, and every move is proven by Verify before it lands.
+#
+# Grouped: one pull request per week is a queue that gets read.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      github-actions:
+        patterns: ["*"]
+    commit-message:
+      prefix: ci

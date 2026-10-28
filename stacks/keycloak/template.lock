@@ -1,0 +1,6 @@
+# The stack this migration is proven on: heyvaldemar's Keycloak template at one
+# release, checked out by commit so that a moved tag cannot change it.
+TEMPLATE_REPO=https://github.com/heyvaldemar/keycloak-traefik-letsencrypt-docker-compose
+TEMPLATE_TAG=v1.8.13
+TEMPLATE_COMMIT=fafbd675045efafaaaa1d93db940659b97e05755
+TEMPLATE_COMPOSE=keycloak-traefik-letsencrypt-docker-compose.yml
